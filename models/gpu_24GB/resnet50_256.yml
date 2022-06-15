@@ -1,0 +1,5 @@
+params:
+    BATCH_SIZE: 10
+    mid_features: 2048
+    learning_rate: 0.002
+    gamma_value: 0.98
