@@ -18,67 +18,11 @@ import numpy as np
 import pathlib
 import logging
 import os
+import sys
 from torchvision.models import resnet50
 import yaml
-# from train_model import CHECKPOINT_PATH, LOAD_CHECKPOINT
 import wandb
 warnings.filterwarnings('ignore')
-
-# This helps make all other paths relative
-base_path = pathlib.Path().absolute()
-
-# Input for the experiment whose results have to be reproduced
-# print("Which model fo you want to run:(1/2/3): EfficientNetB0, EfficientNetB3, Resnet50")
-model_select = 0
-model_name = ""
-while(True):
-    # model_select = int(input())
-    model_select = 3
-    if model_select == 1:
-        model_name = "efficientnet-b0"
-    elif model_select == 2:
-        model_name = "efficientnet-b3"
-    elif model_select == 3:
-        model_name = "resnet50"
-    else:
-        continue
-    break
-
-# print("What image size do you want?(256/512/1024)")
-while(True):
-    # image_size = int(input())
-    image_size = 512
-    if (image_size == 256) | (image_size == 512) | (image_size == 1024):
-        break
-
-# print("GPU settings for 11 GB or 24 GB?(11 or 24)")
-while(True):
-    # model_select = int(input())
-    model_select = 24
-    if(model_select == 11) | (model_select == 24):
-        break
-
-# Input of the required hyperparameters
-with open(f"models/gpu_{model_select}GB/{model_name}_{image_size}.yml", "r") as ymlfile:
-    cfg = yaml.safe_load(ymlfile)
-
-BATCH_SIZE = cfg["params"]["BATCH_SIZE"]
-mid_features = cfg["params"]["mid_features"]
-learning_rate = cfg["params"]["learning_rate"]
-gamma_value = cfg["params"]["gamma_value"]
-
-# Fixed hyperparameters
-LOAD_CHECKPOINT = False
-
-SEED = 42
-num_epoch = 50
-num_workers = 2
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-root_dir = f"{base_path}/ultra-mnist_{image_size}/train"
-EXPERIMENT_NAME = f"{model_name}_{image_size}"
-PATH = f"{base_path}/{EXPERIMENT_NAME}"
-LOG_PATH = f'{PATH}/log_file.txt'
-train_csv_path = f'{base_path}/ultra-mnist_{image_size}/train.csv'
 
 # Seeding to help make results reproduceable
 def seed_everything(seed):
@@ -147,22 +91,19 @@ def run():
     # Loading the pretrained model here
     if 'efficientnet' in model_name:
         model = EfficientNet.from_pretrained(model_name)
-    else:
-        model = resnet50(pretrained = True)
-    
-    # Changing the final fully connected layer
-    if "efficientnet" in model_name:
         model.fc = nn.Sequential(
             nn.Linear(mid_features, 100),
             nn.ReLU(),
             nn.Linear(100, 28)
         )
     else:
+        model = resnet50(pretrained = True)
         model._fc = nn.Sequential(
             nn.Linear(mid_features, 100),
             nn.ReLU(),
             nn.Linear(100, 28)
         )
+       
     for params in model.parameters():
         params.requires_grad = True
 
@@ -234,11 +175,51 @@ def run():
             torch.save({'model_state_dict': model.state_dict(),}, checkpoint_name)
             best_s = valid_acc
         print(f'Train Loss: {train_loss}\tTrain Acc: {train_acc}\tLR: {scheduler.get_lr()}\tValid Accuracy: {valid_acc}', end = '\r')
-        wandb.log({"Train loss": train_loss, "Train Acc": train_acc, "LR": (scheduler.get_lr()[0]), "Valid Accuracy": valid_acc})
+        wandb.log({"Train loss": train_loss, "Train Acc": train_acc, "Learning Rate": (scheduler.get_lr()[0]), "Valid Accuracy": valid_acc})
         scheduler.step()
         epoch+=1
 
 if __name__ == "__main__":
+    # This helps make all other paths relative
+    base_path = pathlib.Path().absolute()
+
+    # Input for the experiment whose results have to be reproduced
+    # arg1:  efficientnet-b0, efficientnet-b3, resnet50")
+    model_name = sys.argv[1]
+    # arg2: (256/512/1024)
+    image_size = int(sys.argv[2])
+    # arg3: (11 or 24)
+    model_select = int(sys.argv[3])
+
+    # Input of the required hyperparameters
+    yml_path = f"models/gpu_{model_select}GB/{model_name}_{image_size}.yml"
+    if not os.path.exists(yml_path):
+        print("No such config file exists.")
+        exit()
+    with open(yml_path, "r") as ymlfile:
+        cfg = yaml.safe_load(ymlfile)
+
+    BATCH_SIZE = cfg["params"]["BATCH_SIZE"]
+    mid_features = cfg["params"]["mid_features"]
+    learning_rate = cfg["params"]["learning_rate"]
+    gamma_value = cfg["params"]["gamma_value"]
+
+    # Fixed hyperparameters
+    LOAD_CHECKPOINT = False
+
+    SEED = 42
+    num_epoch = 50
+    num_workers = 2
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    root_dir = f"{base_path}/ultra-mnist_{image_size}/train"
+    if not os.path.exists(root_dir):
+        print("Dataset missing.")
+    EXPERIMENT_NAME = f"{model_name}_{image_size}"
+    PATH = f"{base_path}/{EXPERIMENT_NAME}"
+    LOG_PATH = f'{PATH}/log_file.txt'
+    train_csv_path = f'{base_path}/ultra-mnist_{image_size}/train.csv'
+
+
     wandb.login()
     wandb.init(project="ultramnist-dgx", entity="gakash2001")
     wandb.config = {

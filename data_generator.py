@@ -3,8 +3,9 @@ import cv2
 import pandas as pd
 import os
 import shutil
-print("Enter image size:\t")
-image_size = int(input())
+import sys
+
+image_size = int(sys.argv[1])
 base_path = os.getcwd()
 print(base_path)
 source_path = f'{base_path}/ultra-mnist'

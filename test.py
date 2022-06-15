@@ -1,5 +1,5 @@
 # importing required modules
-import gc
+import sys
 import os
 import numpy as np
 import pandas as pd
@@ -17,67 +17,6 @@ import yaml
 import warnings
 
 warnings.filterwarnings('ignore')
-
-# This helps make all other paths relative
-base_path = pathlib.Path().absolute()
-
-# Input for the experiment whose results have to be reproduced
-print("Which model fo you want to run:(1/2/3): EfficientNetB0, EfficientNetB3, Resnet50")
-model_select = 0
-model_name = ""
-load_epoch = 0
-while(True):
-    # model_select = int(input())
-    model_select = 3
-    if model_select == 1:
-        model_name = "efficientnet-b0"
-    elif model_select == 2:
-        model_name = "efficientnet-b3"
-    elif model_select == 3:
-        model_name = "resnet50"
-    else:
-        continue
-    break
-
-print("What image size do you want?(256/512/1024)")
-while(True):
-    # image_size = int(input())
-    image_size =1024
-    if (image_size == 256) | (image_size == 512) | (image_size == 1024):
-        break
-
-print("Enter the epoch number to load.")
-while(True):
-    # load_epoch = int(input())
-    load_epoch = 18
-    if(model_select >= 0) & (model_select < 51):
-        break
-
-# Input of the required hyperparameters
-with open(f"models/gpu_11GB/{model_name}_{image_size}.yml", "r") as ymlfile:
-    cfg = yaml.safe_load(ymlfile)
-BATCH_SIZE = 4*cfg["params"]["BATCH_SIZE"]
-mid_features = cfg["params"]["mid_features"]
-
-# Fixed hyperparameters
-SEED = 42
-EPOCHS = 50
-num_workers = 2
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-root_dir = f"{base_path}/ultra-mnist_{image_size}/train"
-EXPERIMENT_NAME = f"{model_name}_{image_size}"
-PATH = f"{base_path}/{EXPERIMENT_NAME}"
-LOG_PATH = f'{PATH}/log_file.txt'
-train_csv_path = f'{base_path}/ultra-mnist_{image_size}/train.csv'
-
-# DEFINING hyperameters
-pretrained_model = f'{base_path}/{model_name}_{image_size}/checkpoint_{load_epoch}.pth.tar'
-print(pretrained_model)
-sample_csv_path = f'{base_path}/ultra-mnist_{image_size}/sample_submission.csv'
-sample_df = pd.read_csv(sample_csv_path)
-
-X_final = sample_df['id']
-y_final = sample_df["digit_sum"]
 
 # Training dataset
 class CustomDataset(Dataset):
@@ -118,22 +57,19 @@ def run():
     # Loading the pretrained model here
     if 'efficientnet' in model_name:
         model = EfficientNet.from_pretrained(model_name)
-    else:
-        model = resnet50(pretrained = True)
-
-    if "efficientnet" in model_name:
         model.fc = nn.Sequential(
             nn.Linear(mid_features, 100),
             nn.ReLU(),
             nn.Linear(100, 28)
         )
     else:
+        model = resnet50(pretrained = True)
         model._fc = nn.Sequential(
             nn.Linear(mid_features, 100),
             nn.ReLU(),
             nn.Linear(100, 28)
         )
-
+        
     # loading the trained weights
     model.load_state_dict(torch.load(pretrained_model)['model_state_dict'])
     model.eval()
@@ -159,4 +95,46 @@ def run():
     sample_df.to_csv('submission.csv', index=False)
 
 if __name__ == "__main__":
+    # This helps make all other paths relative
+    base_path = pathlib.Path().absolute()
+
+    # Input for the experiment whose results have to be reproduced
+    # arg1: efficientnet-b0, efficientner-b3, resnet50
+    model_name = sys.argv[1]
+    # arg2: (256/512/1024)
+    image_size = int(sys.argv[2])
+    # epoch number to load
+    load_epoch = int(sys.argv[3])
+
+    # Input of the required hyperparameters
+    yml_path = f"models/gpu_11GB/{model_name}_{image_size}.yml"
+    if not os.path.exists(yml_path):
+        print("No such yml file")
+        exit()
+    with open(yml_path, "r") as ymlfile:
+        cfg = yaml.safe_load(ymlfile)
+    BATCH_SIZE = 4*cfg["params"]["BATCH_SIZE"]
+    mid_features = cfg["params"]["mid_features"]
+
+    # Fixed hyperparameters
+    SEED = 42
+    EPOCHS = 50
+    num_workers = 2
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    root_dir = f"{base_path}/ultra-mnist_{image_size}/train"
+    EXPERIMENT_NAME = f"{model_name}_{image_size}"
+    PATH = f"{base_path}/{EXPERIMENT_NAME}"
+    train_csv_path = f'{base_path}/ultra-mnist_{image_size}/train.csv'
+
+    # DEFINING hyperameters
+    pretrained_model = f'{base_path}/{model_name}_{image_size}/checkpoint_{load_epoch}.pth.tar'
+    if not os.path.exists(pretrained_model):
+        print(pretrained_model)
+        print("No such pretrained model file exits.")
+        exit()
+    sample_csv_path = f'{base_path}/ultra-mnist_{image_size}/sample_submission.csv'
+    sample_df = pd.read_csv(sample_csv_path)
+
+    X_final = sample_df['id']
+    y_final = sample_df["digit_sum"]
     run()
