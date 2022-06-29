@@ -1,6 +1,6 @@
 import os
 import argparse
-from ultramnist import CreateUltraMNIST
+from .ultramnist import CreateUltraMNIST
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--root_path", type=str, default="../data/", help="path to the root directory where the generated data will be stored")
