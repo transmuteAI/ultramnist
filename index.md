@@ -1,4 +1,4 @@
-## UltraMNIST: A Benchmark to Train CNNs on Very Large Images
+## UltraMNIST Benchmark
 
 You can use the [editor on GitHub](https://github.com/transmuteAI/ultramnist/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
 
