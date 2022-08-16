@@ -1,1 +1,4 @@
 theme: jekyll-theme-cayman
+github:
+  zip_url: https://github.com/transmuteAI/ultramnist/archive/refs/heads/main.zip
+  tar_url: https://github.com/transmuteAI/ultramnist/archive/refs/heads/main.tar.gz
